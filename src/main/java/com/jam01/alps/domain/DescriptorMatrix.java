@@ -1,6 +1,6 @@
 package com.jam01.alps.domain;
 
-import com.jam01.alps.domain.exception.ValidationException;
+import com.jam01.alps.domain.exception.AlpsValidationException;
 
 import java.net.URI;
 import java.util.*;
@@ -17,7 +17,7 @@ public class DescriptorMatrix {
 
 	public void addDescriptor(Descriptor toAdd) {
 		if (descriptorMap.containsKey(toAdd.get_Id()))
-			throw new ValidationException("IDs MUST be unique within ALPS profile per Section 2.2.7");
+			throw new AlpsValidationException(toAdd.get_Id() + " MUST be unique within ALPS profile per Section 2.2.7");
 		descriptorMap.put(toAdd.get_Id(), toAdd);
 	}
 

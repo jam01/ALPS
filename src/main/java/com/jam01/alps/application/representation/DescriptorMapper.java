@@ -4,7 +4,7 @@ import com.jam01.alps.domain.Descriptor;
 import com.jam01.alps.domain.DescriptorMatrix;
 import com.jam01.alps.domain.Id;
 import com.jam01.alps.domain.Type;
-import com.jam01.alps.domain.exception.ValidationException;
+import com.jam01.alps.domain.exception.AlpsValidationException;
 
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -52,15 +52,16 @@ public class DescriptorMapper {
 			URI uriId;
 			Type descType;
 
+			String uriFragment;
+			if (dto.id != null)
+				uriFragment = dto.id;
+			else
+				uriFragment = UUID.randomUUID().toString();
+
 			try {
-				String uriFragment;
-				if (dto.id != null)
-					uriFragment = dto.id;
-				else
-					uriFragment = UUID.randomUUID().toString();
 				uriId = new URI(null, null, null, uriFragment);
 			} catch (URISyntaxException e) {
-				throw new IllegalArgumentException("Cannot convert string to URI");
+				throw new AlpsValidationException(uriFragment + " is an invalid URI");
 			}
 
 
@@ -70,7 +71,7 @@ public class DescriptorMapper {
 				try {
 					descType = Type.valueOf(dto.type.toUpperCase());
 				} catch (IllegalArgumentException e) {
-					throw new ValidationException("Invalid type value. See section 2.2.12");
+					throw new AlpsValidationException(dto.type + " is an invalid type value. See section 2.2.12");
 				}
 
 			toReturn = new Descriptor(
@@ -99,6 +100,7 @@ public class DescriptorMapper {
 		Descriptor toAdd = mapFrom(dto);
 		matrix.addDescriptor(toAdd);
 		// Add relations to matrix if they exist
+		// TODO: 9/6/17 consider Section 2.2.3 about checking that hrefs MUST be dereferenceable URLs pointing to another 'descriptor'
 		if (dto.href != null)
 			matrix.addSuperRelation(toAdd, escapedFragment(dto.href));
 		if (dto.rt != null)
@@ -139,11 +141,11 @@ public class DescriptorMapper {
 				toReturn = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
 			}
 		} catch (URISyntaxException | MalformedURLException e) {
-			throw new ValidationException(uri + " is not valid URI. See section 2.2.6", e);
+			throw new AlpsValidationException(uri + " is not valid URI. See section 2.2.6", e);
 		}
 
 		if (toReturn.getFragment() == null)
-			throw new ValidationException("The URL MUST contain a fragment per Section 2.2.7.2 referencing the related 'descriptor'.");
+			throw new AlpsValidationException(uri + " MUST contain a fragment per Section 2.2.7.2 referencing the related 'descriptor'.");
 
 		return toReturn;
 	}
