@@ -1,5 +1,7 @@
 package com.jam01.alps.domain;
 
+import com.jam01.alps.domain.exception.AlpsValidationException;
+
 import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,6 +32,7 @@ public class Alps {
 			Set<Map.Entry<URI, List<URI>>> childRelations = new HashSet<>();
 			Set<Map.Entry<URI, URI>> superDescRelations = new HashSet<>();
 			Set<Map.Entry<URI, URI>> returnRelations = new HashSet<>();
+			Map<URI, Descriptor> externalDescriptors = new HashMap<>();
 
 			for (DescriptorMatrix graph : graphs) {
 				descriptorMap.putAll(graph.getDescriptorMap());
@@ -39,14 +42,38 @@ public class Alps {
 			}
 
 			for (Map.Entry<URI, URI> superRel : superDescRelations) {
-				Descriptor superDescriptor = descriptorMap.get(superRel.getValue());
-				if (superDescriptor == null)
-					superDescriptor = new Descriptor(null, null, null, null, superRel.getValue());
+				Descriptor superDescriptor;
+
+				if (!superRel.getValue().isAbsolute()) {
+					superDescriptor = descriptorMap.get(superRel.getValue());
+					if (superDescriptor == null)
+						throw new AlpsValidationException(superRel.getValue().toString() + " does refer to a local 'descriptor' within the document per section 2.2.7.2.");
+				} else {
+					superDescriptor = externalDescriptors.get(superRel.getValue());
+					if (superDescriptor == null) {
+						superDescriptor = new Descriptor(null, null, null, null, superRel.getValue());
+						externalDescriptors.put(superDescriptor.get_Id(), superDescriptor);
+					}
+				}
 				descriptorMap.get(superRel.getKey()).setSuperDescriptor(superDescriptor);
 			}
 
 			for (Map.Entry<URI, URI> returnRel : returnRelations) {
-				descriptorMap.get(returnRel.getKey()).setRt(descriptorMap.get(returnRel.getValue()));
+				Descriptor descriptorToReturn;
+
+				if (!returnRel.getValue().isAbsolute()) {
+					descriptorToReturn = descriptorMap.get(returnRel.getValue());
+					if (descriptorToReturn == null)
+						throw new AlpsValidationException(returnRel.getValue().toString() + " does refer to a local 'descriptor' within the document per section 2.2.7.2.");
+				} else {
+					descriptorToReturn = externalDescriptors.get(returnRel.getValue());
+					if (descriptorToReturn == null) {
+						descriptorToReturn = new Descriptor(null, null, null, null, returnRel.getValue());
+						externalDescriptors.put(descriptorToReturn.get_Id(), descriptorToReturn);
+					}
+				}
+
+				descriptorMap.get(returnRel.getKey()).setRt(descriptorToReturn);
 			}
 
 			for (Map.Entry<URI, List<URI>> childRel : childRelations) {
@@ -56,7 +83,10 @@ public class Alps {
 			}
 
 			// Add all roots
-			roots.addAll(graphs.stream().map(DescriptorMatrix::getLastRoot).map(rootURI -> descriptorMap.get(rootURI)).collect(Collectors.toList()));
+			roots.addAll(graphs.stream()
+					.map(DescriptorMatrix::getLastRoot)
+					.map(rootURI -> descriptorMap.get(rootURI))
+					.collect(Collectors.toList()));
 		}
 
 	}
